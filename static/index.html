@@ -84,6 +84,15 @@
       if (t && t.density && t.density !== 'comfortable') {
         document.documentElement.classList.add('density-' + t.density);
       }
+      // Apply saved UI size early so it doesn't flash at the default.
+      // 100% = 17px base (BASE_FONT_PX in theme.js); keep in sync.
+      if (t && t.uiScale && t.uiScale !== 100) {
+        document.documentElement.style.setProperty('font-size', Math.round(17 * t.uiScale / 100) + 'px');
+      }
+      // Apply saved Nav size early (--nav-scale = percent/100).
+      if (t && t.navScale && t.navScale !== 100) {
+        document.documentElement.style.setProperty('--nav-scale', String(t.navScale / 100));
+      }
       // Apply background pattern on body once available
       if (t && t.bgPattern && t.bgPattern !== 'none') {
         document.addEventListener('DOMContentLoaded', function() {
@@ -579,6 +588,16 @@
               <input type="checkbox" id="theme-frosted-toggle">
               <span class="admin-slider"></span>
             </label>
+          </div>
+        </div>
+        <div class="theme-fd-row">
+          <div class="theme-fd-group" style="flex:1 1 0;">
+            <label class="theme-fd-label">UI size <span id="theme-uiscale-value" style="opacity:0.6;font-variant-numeric:tabular-nums;">100%</span></label>
+            <input type="range" id="theme-uiscale" class="theme-fd-range" min="50" max="200" step="10" value="100" aria-label="UI size">
+          </div>
+          <div class="theme-fd-group" style="flex:1 1 0;">
+            <label class="theme-fd-label">Nav size <span id="theme-navscale-value" style="opacity:0.6;font-variant-numeric:tabular-nums;">100%</span></label>
+            <input type="range" id="theme-navscale" class="theme-fd-range" min="50" max="300" step="10" value="100" aria-label="Nav size">
           </div>
         </div>
         <div class="theme-fd-row">
