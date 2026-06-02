@@ -84,10 +84,14 @@
       if (t && t.density && t.density !== 'comfortable') {
         document.documentElement.classList.add('density-' + t.density);
       }
-      // Apply saved UI size early so it doesn't flash at the default.
-      // 100% = 17px base (BASE_FONT_PX in theme.js); keep in sync.
+      // Apply saved UI size early (--win-scale = percent/100; pop-up window size).
       if (t && t.uiScale && t.uiScale !== 100) {
-        document.documentElement.style.setProperty('font-size', Math.round(17 * t.uiScale / 100) + 'px');
+        document.documentElement.style.setProperty('--win-scale', String(t.uiScale / 100));
+      }
+      // Apply saved Text size early so it doesn't flash at the default.
+      // 100% = 17px base (BASE_FONT_PX in theme.js); keep in sync.
+      if (t && t.textScale && t.textScale !== 100) {
+        document.documentElement.style.setProperty('font-size', Math.round(17 * t.textScale / 100) + 'px');
       }
       // Apply saved Nav size early (--nav-scale = percent/100).
       if (t && t.navScale && t.navScale !== 100) {
@@ -593,8 +597,14 @@
         <div class="theme-fd-row">
           <div class="theme-fd-group" style="flex:1 1 0;">
             <label class="theme-fd-label">UI size <span id="theme-uiscale-value" style="opacity:0.6;font-variant-numeric:tabular-nums;">100%</span></label>
-            <input type="range" id="theme-uiscale" class="theme-fd-range" min="50" max="200" step="10" value="100" aria-label="UI size">
+            <input type="range" id="theme-uiscale" class="theme-fd-range" min="70" max="160" step="5" value="100" aria-label="UI size (pop-up window size)">
           </div>
+          <div class="theme-fd-group" style="flex:1 1 0;">
+            <label class="theme-fd-label">Text size <span id="theme-textscale-value" style="opacity:0.6;font-variant-numeric:tabular-nums;">100%</span></label>
+            <input type="range" id="theme-textscale" class="theme-fd-range" min="50" max="200" step="10" value="100" aria-label="Text size">
+          </div>
+        </div>
+        <div class="theme-fd-row">
           <div class="theme-fd-group" style="flex:1 1 0;">
             <label class="theme-fd-label">Nav size <span id="theme-navscale-value" style="opacity:0.6;font-variant-numeric:tabular-nums;">100%</span></label>
             <input type="range" id="theme-navscale" class="theme-fd-range" min="50" max="300" step="10" value="100" aria-label="Nav size">
