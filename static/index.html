@@ -1008,7 +1008,7 @@
 
     <!-- Hidden elements for form logic -->
     <input type="checkbox" id="research-toggle" style="display:none;">
-    <input type="checkbox" id="rag-toggle" style="display:none;">
+    <input type="checkbox" id="rag-toggle" style="display:none;" checked>
     <input type="checkbox" id="incognito-toggle" style="display:none;">
     <input type="file" id="file-input" class="hidden" multiple />
 
@@ -1601,6 +1601,17 @@
               </div>
               <div id="set-teacherChatMsg" style="font-size:11px;color:color-mix(in srgb, var(--fg) 45%, transparent);"></div>
             </div>
+          </div>
+          <div class="admin-card">
+            <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:0.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Personal Documents</h2>
+            <div class="admin-toggle-sub" style="margin-bottom:8px">Files and folders indexed into RAG. Retrieved into chat context when relevant, grounding answers in your own docs. Enable the RAG toggle in chat to use them.</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:8px;">
+              <input type="text" id="rag-directory" class="settings-select" style="flex:1;" placeholder="Directory path (absolute, or relative to personal_docs)">
+              <button type="button" class="admin-btn-add" id="add-directory-btn">+ Index</button>
+            </div>
+            <div id="rag-upload-zone" style="border:1px dashed color-mix(in srgb, var(--fg) 25%, transparent);border-radius:8px;padding:14px;text-align:center;font-size:12px;color:color-mix(in srgb, var(--fg) 55%, transparent);cursor:pointer;margin-bottom:8px;">Drop files here or click to upload</div>
+            <input type="file" id="rag-file-input" multiple style="display:none;">
+            <div id="docs-view" class="admin-user-list"></div>
           </div>
         </div>
 

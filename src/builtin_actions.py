@@ -2187,7 +2187,62 @@ async def action_check_email_urgency(owner: str, **kwargs) -> Tuple[str, bool]:
         return str(e), False
 
 
+async def action_get_fuel_price(owner: str, fuel: str = "", **kwargs) -> Tuple[str, bool]:
+    """Scrape carbu.com's official Belgian price table for one fuel and report
+    today's price -> the upcoming official price with an up/down arrow. Fully
+    deterministic (raw HTML + regex) — no LLM, so no truncation/hallucination."""
+    import asyncio
+    import re
+    import urllib.request
+
+    # Comma-separated override via `fuel`, else the default trio.
+    if fuel and fuel.strip():
+        wanted = [f.strip() for f in fuel.split(",") if f.strip()]
+    else:
+        wanted = ["Super 95 (E10)", "Super 98 (E5)", "Diesel (B7)"]
+
+    def _scrape():
+        url = "https://carbu.com/belgie/index.php/officieleprijs"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        html = urllib.request.urlopen(req, timeout=20).read().decode("utf-8", "ignore")
+        table = {}
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S):
+            txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
+            for label in wanted:
+                # First matching row per fuel is the official-price row
+                # (today + upcoming); later rows are margin tables (1 price).
+                if label in table or not txt.startswith(label):
+                    continue
+                prices = re.findall(r"(\d,\d{3,4})\s*&euro;/l", row)
+                if len(prices) < 2:
+                    continue
+                arrow = "↑" if "arrow-up" in row else ("↓" if "arrow-down" in row else "=")
+                table[label] = (prices[0], prices[1], arrow)
+        return table
+
+    try:
+        table = await asyncio.to_thread(_scrape)
+    except Exception as e:
+        return f"Fuel price fetch failed: {e}", False
+    if not table:
+        return "No fuel prices found on carbu.com", False
+
+    lines = []
+    for label in wanted:
+        name = label.replace("(", "").replace(")", "").strip()
+        if label not in table:
+            lines.append(f"{name}: not found")
+            continue
+        today, upcoming, arrow = table[label]
+        if today == upcoming:
+            lines.append(f"{name}: no change ({today} €/l)")
+        else:
+            lines.append(f"{name}: {today} → {upcoming} {arrow} €/l")
+    return "\n".join(lines), True
+
+
 BUILTIN_ACTIONS = {
+    "get_fuel_price": action_get_fuel_price,
     "tidy_sessions": action_tidy_sessions,
     "tidy_documents": action_tidy_documents,
     "consolidate_memory": action_consolidate_memory,
@@ -2212,6 +2267,7 @@ BUILTIN_ACTIONS = {
 
 # Descriptions for the UI/API
 BUILTIN_ACTION_INFO = {
+    "get_fuel_price": "Fetch the official Belgian fuel price from carbu.com (today's price → upcoming price with arrow). Diesel (B7) by default — deterministic, no LLM.",
     "tidy_sessions": "Clean up empty chat sessions and auto-sort into folders",
     "tidy_documents": "Remove junk/empty documents",
     "consolidate_memory": "Remove duplicate memories",
