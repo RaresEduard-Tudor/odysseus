@@ -41,6 +41,28 @@ const FONT_MAP = {
 };
 const DEFAULT_FONT = 'mono';
 const DEFAULT_DENSITY = 'comfortable';
+// UI size as a percentage (100% = default). Drives the --win-scale CSS var,
+// which multiplies the pop-up window (modal) dimensions in style.css. Affects
+// only window size, not text.
+const DEFAULT_UI_SCALE = 100;
+const MIN_UI_SCALE = 70;
+const MAX_UI_SCALE = 160;
+
+// Text size as a percentage (100% = BASE_FONT_PX). Overrides the root
+// font-size inline; everything else is em/rem so all text scales with it.
+// Independent of window size and nav size.
+const DEFAULT_TEXT_SCALE = 100;
+const MIN_TEXT_SCALE = 50;
+const MAX_TEXT_SCALE = 200;
+const BASE_FONT_PX = 17;
+
+// Nav size as a percentage, independent of UI size. Drives the --nav-scale CSS
+// var (= percent/100); the left nav (icon rail + sidebar menu) sizes its text
+// and icons via calc(px * var(--nav-scale)), so this control resizes only the
+// nav, not the content.
+const DEFAULT_NAV_SCALE = 100;
+const MIN_NAV_SCALE = 50;
+const MAX_NAV_SCALE = 300;
 const MAX_CUSTOM_THEMES = 8;
 
 // Default background patterns for built-in themes
@@ -96,6 +118,9 @@ export function saveCustomTheme(name, colors, opts) {
   if (opts) {
     if (opts.font) entry.font = opts.font;
     if (opts.density) entry.density = opts.density;
+    if (opts.uiScale !== undefined && opts.uiScale !== DEFAULT_UI_SCALE) entry.uiScale = opts.uiScale;
+    if (opts.textScale !== undefined && opts.textScale !== DEFAULT_TEXT_SCALE) entry.textScale = opts.textScale;
+    if (opts.navScale !== undefined && opts.navScale !== DEFAULT_NAV_SCALE) entry.navScale = opts.navScale;
     if (opts.bgPattern) entry.bgPattern = opts.bgPattern;
     if (opts.bgEffectColor) entry.bgEffectColor = opts.bgEffectColor;
     if (opts.bgEffectIntensity !== undefined) entry.bgEffectIntensity = opts.bgEffectIntensity;
@@ -384,6 +409,47 @@ export function applyFontDensity(font, density) {
   if (d !== 'comfortable') document.documentElement.classList.add('density-' + d);
 }
 
+/** Set the UI size as a percentage (100% = default). Drives the --win-scale
+ *  CSS var that pop-up windows (modals) multiply their dimensions by; affects
+ *  window size only, not text. Default/null clears the var so the calc()
+ *  fallback (1) applies. */
+export function applyUiScale(percent) {
+  const root = document.documentElement.style;
+  if (percent === undefined || percent === null || isNaN(percent) || Number(percent) === DEFAULT_UI_SCALE) {
+    root.removeProperty('--win-scale');
+    return;
+  }
+  const p = Math.max(MIN_UI_SCALE, Math.min(MAX_UI_SCALE, Number(percent)));
+  root.setProperty('--win-scale', String(p / 100));
+}
+
+/** Set the Text size as a percentage of the base (100% = BASE_FONT_PX). Drives
+ *  the root font-size; everything is em/rem so all text scales. Independent of
+ *  window size and nav size. Default/null clears the inline override so the
+ *  density class / CSS default governs. */
+export function applyTextScale(percent) {
+  const root = document.documentElement.style;
+  if (percent === undefined || percent === null || isNaN(percent) || Number(percent) === DEFAULT_TEXT_SCALE) {
+    root.removeProperty('font-size');
+    return;
+  }
+  const p = Math.max(MIN_TEXT_SCALE, Math.min(MAX_TEXT_SCALE, Number(percent)));
+  root.setProperty('font-size', Math.round(BASE_FONT_PX * p / 100) + 'px');
+}
+
+/** Set the Nav size as a percentage (100% = default). Drives the --nav-scale
+ *  CSS var that the left nav uses; independent of UI size. Default/null clears
+ *  the var so the calc() fallback (1) applies. */
+export function applyNavScale(percent) {
+  const root = document.documentElement.style;
+  if (percent === undefined || percent === null || isNaN(percent) || Number(percent) === DEFAULT_NAV_SCALE) {
+    root.removeProperty('--nav-scale');
+    return;
+  }
+  const p = Math.max(MIN_NAV_SCALE, Math.min(MAX_NAV_SCALE, Number(percent)));
+  root.setProperty('--nav-scale', String(p / 100));
+}
+
 const _BG_CLASSES = ['bg-pattern-dots',
   'bg-pattern-synapse', 'bg-pattern-rain', 'bg-pattern-constellations',
   'bg-pattern-perlin-flow',
@@ -453,6 +519,9 @@ export function save(name, colors, opts) {
   if (opts) {
     if (opts.font && opts.font !== DEFAULT_FONT) obj.font = opts.font;
     if (opts.density && opts.density !== DEFAULT_DENSITY) obj.density = opts.density;
+    if (opts.uiScale !== undefined && opts.uiScale !== DEFAULT_UI_SCALE) obj.uiScale = opts.uiScale;
+    if (opts.textScale !== undefined && opts.textScale !== DEFAULT_TEXT_SCALE) obj.textScale = opts.textScale;
+    if (opts.navScale !== undefined && opts.navScale !== DEFAULT_NAV_SCALE) obj.navScale = opts.navScale;
     if (opts.bgPattern && opts.bgPattern !== 'none') obj.bgPattern = opts.bgPattern;
     if (opts.bgEffectColor) obj.bgEffectColor = opts.bgEffectColor;
     if (opts.bgEffectIntensity !== undefined && opts.bgEffectIntensity !== 1) obj.bgEffectIntensity = opts.bgEffectIntensity;
@@ -666,6 +735,12 @@ export function initThemeUI() {
     const sz = document.getElementById('theme-bg-size');
     if (fs) opts.font = fs.value;
     if (ds) opts.density = ds.value;
+    const tz = document.getElementById('theme-uiscale');
+    if (tz) opts.uiScale = parseInt(tz.value, 10);
+    const txz = document.getElementById('theme-textscale');
+    if (txz) opts.textScale = parseInt(txz.value, 10);
+    const nz = document.getElementById('theme-navscale');
+    if (nz) opts.navScale = parseInt(nz.value, 10);
     if (ps) opts.bgPattern = ps.value;
     if (ec) opts.bgEffectColor = ec.value;
     if (es) opts.bgEffectIntensity = parseFloat(es.value) / 100;
@@ -693,6 +768,9 @@ export function initThemeUI() {
         const ct = sw.dataset.custom ? customThemes[name] : null;
         const f = ct && ct.font ? ct.font : DEFAULT_FONT;
         const d = ct && ct.density ? ct.density : DEFAULT_DENSITY;
+        const tz = (ct && ct.uiScale !== undefined) ? ct.uiScale : DEFAULT_UI_SCALE;
+        const txz = (ct && ct.textScale !== undefined) ? ct.textScale : DEFAULT_TEXT_SCALE;
+        const nz = (ct && ct.navScale !== undefined) ? ct.navScale : DEFAULT_NAV_SCALE;
         const p = ct && ct.bgPattern ? ct.bgPattern : (THEME_DEFAULT_PATTERN[name] || 'none');
         const ec = ct && ct.bgEffectColor ? ct.bgEffectColor : (THEME_DEFAULT_EFFECT_COLOR[name] || '');
         const ei = (ct && ct.bgEffectIntensity !== undefined) ? ct.bgEffectIntensity : (THEME_DEFAULT_INTENSITY[name] !== undefined ? THEME_DEFAULT_INTENSITY[name] : 1);
@@ -701,6 +779,9 @@ export function initThemeUI() {
           ? !!ct.frosted
           : (THEME_DEFAULT_FROSTED[name] === true);
         applyFontDensity(f, d);
+        applyUiScale(tz);
+        applyTextScale(txz);
+        applyNavScale(nz);
         applyBgEffectColor(ec);
         applyBgEffectIntensity(ei);
         applyBgEffectSize(sz);
@@ -708,6 +789,12 @@ export function initThemeUI() {
         applyBgPattern(p);
         const fs = document.getElementById('theme-font-select');
         const ds = document.getElementById('theme-density-select');
+        const tzs = document.getElementById('theme-uiscale');
+        const tzv = document.getElementById('theme-uiscale-value');
+        const txzs = document.getElementById('theme-textscale');
+        const txzv = document.getElementById('theme-textscale-value');
+        const nzs = document.getElementById('theme-navscale');
+        const nzv = document.getElementById('theme-navscale-value');
         const ps = document.getElementById('theme-bg-pattern-select');
         const ecs = document.getElementById('theme-bg-effect-color');
         const eis = document.getElementById('theme-bg-intensity');
@@ -715,12 +802,18 @@ export function initThemeUI() {
         const frs = document.getElementById('theme-frosted-toggle');
         if (fs) fs.value = f;
         if (ds) ds.value = d;
+        if (tzs) tzs.value = String(tz);
+        if (tzv) tzv.textContent = tz + '%';
+        if (txzs) txzs.value = String(txz);
+        if (txzv) txzv.textContent = txz + '%';
+        if (nzs) nzs.value = String(nz);
+        if (nzv) nzv.textContent = nz + '%';
         if (ps) ps.value = p;
         if (ecs) ecs.value = ec || colors.fg || '#9cdef2';
         if (eis) eis.value = String(Math.round(ei * 100));
         if (szs) szs.value = String(Math.round(sz * 100));
         if (frs) frs.checked = fr;
-        save(name, colors, { font: f, density: d, bgPattern: p, bgEffectColor: ec, bgEffectIntensity: ei, bgEffectSize: sz, frosted: fr });
+        save(name, colors, { font: f, density: d, uiScale: tz, textScale: txz, navScale: nz, bgPattern: p, bgEffectColor: ec, bgEffectIntensity: ei, bgEffectSize: sz, frosted: fr });
       });
     });
     g.querySelectorAll('.theme-delete-btn').forEach(btn => {
@@ -850,6 +943,7 @@ export function initThemeUI() {
         // Preserve advanced/opts keys that aren't part of basic colors.
         saveCustomTheme(_activeName, colors, {
           font: _activeSaved.font, density: _activeSaved.density,
+          uiScale: _activeSaved.uiScale, textScale: _activeSaved.textScale, navScale: _activeSaved.navScale,
           bgPattern: _activeSaved.bgPattern, bgEffectColor: _activeSaved.bgEffectColor,
           bgEffectIntensity: _activeSaved.bgEffectIntensity,
           bgEffectSize: _activeSaved.bgEffectSize,
@@ -921,12 +1015,27 @@ export function initThemeUI() {
       applyColors(colors);
       syncPickers(colors);
       applyFontDensity(DEFAULT_FONT, DEFAULT_DENSITY);
+      applyUiScale(DEFAULT_UI_SCALE);
+      applyTextScale(DEFAULT_TEXT_SCALE);
+      applyNavScale(DEFAULT_NAV_SCALE);
       applyBgPattern('none');
       const fs = document.getElementById('theme-font-select');
       const ds = document.getElementById('theme-density-select');
+      const tzs = document.getElementById('theme-uiscale');
+      const tzv = document.getElementById('theme-uiscale-value');
+      const txzs = document.getElementById('theme-textscale');
+      const txzv = document.getElementById('theme-textscale-value');
+      const nzs = document.getElementById('theme-navscale');
+      const nzv = document.getElementById('theme-navscale-value');
       const ps = document.getElementById('theme-bg-pattern-select');
       if (fs) fs.value = DEFAULT_FONT;
       if (ds) ds.value = DEFAULT_DENSITY;
+      if (tzs) tzs.value = String(DEFAULT_UI_SCALE);
+      if (tzv) tzv.textContent = DEFAULT_UI_SCALE + '%';
+      if (txzs) txzs.value = String(DEFAULT_TEXT_SCALE);
+      if (txzv) txzv.textContent = DEFAULT_TEXT_SCALE + '%';
+      if (nzs) nzs.value = String(DEFAULT_NAV_SCALE);
+      if (nzv) nzv.textContent = DEFAULT_NAV_SCALE + '%';
       if (ps) ps.value = 'none';
       grid.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
       const darkSwatch = grid.querySelector('[data-theme="dark"]');
@@ -998,6 +1107,7 @@ export function initThemeUI() {
       if (_activeName && _customMap && _customMap[_activeName]) {
         saveCustomTheme(_activeName, base, {
           font: _activeSaved.font, density: _activeSaved.density,
+          uiScale: _activeSaved.uiScale, textScale: _activeSaved.textScale, navScale: _activeSaved.navScale,
           bgPattern: _activeSaved.bgPattern, bgEffectColor: _activeSaved.bgEffectColor,
           bgEffectIntensity: _activeSaved.bgEffectIntensity,
           bgEffectSize: _activeSaved.bgEffectSize,
@@ -1076,6 +1186,9 @@ export function initThemeUI() {
   // Font, density, background pattern controls
   const _initFont = (saved && saved.font) || DEFAULT_FONT;
   const _initDensity = (saved && saved.density) || DEFAULT_DENSITY;
+  const _initUiScale = (saved && saved.uiScale !== undefined) ? saved.uiScale : DEFAULT_UI_SCALE;
+  const _initTextScale = (saved && saved.textScale !== undefined) ? saved.textScale : DEFAULT_TEXT_SCALE;
+  const _initNavScale = (saved && saved.navScale !== undefined) ? saved.navScale : DEFAULT_NAV_SCALE;
   const _initPattern = (saved && saved.bgPattern) || (saved && THEME_DEFAULT_PATTERN[saved.name]) || 'none';
   const _initEffectColor = (saved && saved.bgEffectColor) || (saved && THEME_DEFAULT_EFFECT_COLOR[saved.name]) || '';
   const _initEffectIntensity = (saved && saved.bgEffectIntensity !== undefined)
@@ -1086,6 +1199,9 @@ export function initThemeUI() {
     ? !!saved.frosted
     : (saved && THEME_DEFAULT_FROSTED[saved.name] === true);
   applyFontDensity(_initFont, _initDensity);
+  applyUiScale(_initUiScale);
+  applyTextScale(_initTextScale);
+  applyNavScale(_initNavScale);
   applyBgEffectColor(_initEffectColor);
   applyBgEffectIntensity(_initEffectIntensity);
   applyBgEffectSize(_initEffectSize);
@@ -1127,6 +1243,45 @@ export function initThemeUI() {
     nd.value = _initDensity;
     nd.addEventListener('change', () => {
       applyFontDensity(document.getElementById('theme-font-select').value, nd.value);
+      const s = getSaved(); if (s) _saveFull(s.name, s.colors);
+    });
+  }
+  const uiScaleSlider = document.getElementById('theme-uiscale');
+  const uiScaleValue = document.getElementById('theme-uiscale-value');
+  if (uiScaleSlider) {
+    const nuz = uiScaleSlider.cloneNode(true); uiScaleSlider.parentNode.replaceChild(nuz, uiScaleSlider);
+    nuz.value = String(_initUiScale);
+    if (uiScaleValue) uiScaleValue.textContent = _initUiScale + '%';
+    nuz.addEventListener('input', () => {
+      const pct = parseInt(nuz.value, 10);
+      applyUiScale(pct);
+      if (uiScaleValue) uiScaleValue.textContent = pct + '%';
+      const s = getSaved(); if (s) _saveFull(s.name, s.colors);
+    });
+  }
+  const textScaleSlider = document.getElementById('theme-textscale');
+  const textScaleValue = document.getElementById('theme-textscale-value');
+  if (textScaleSlider) {
+    const ntz = textScaleSlider.cloneNode(true); textScaleSlider.parentNode.replaceChild(ntz, textScaleSlider);
+    ntz.value = String(_initTextScale);
+    if (textScaleValue) textScaleValue.textContent = _initTextScale + '%';
+    ntz.addEventListener('input', () => {
+      const pct = parseInt(ntz.value, 10);
+      applyTextScale(pct);
+      if (textScaleValue) textScaleValue.textContent = pct + '%';
+      const s = getSaved(); if (s) _saveFull(s.name, s.colors);
+    });
+  }
+  const navScaleSlider = document.getElementById('theme-navscale');
+  const navScaleValue = document.getElementById('theme-navscale-value');
+  if (navScaleSlider) {
+    const nnz = navScaleSlider.cloneNode(true); navScaleSlider.parentNode.replaceChild(nnz, navScaleSlider);
+    nnz.value = String(_initNavScale);
+    if (navScaleValue) navScaleValue.textContent = _initNavScale + '%';
+    nnz.addEventListener('input', () => {
+      const pct = parseInt(nnz.value, 10);
+      applyNavScale(pct);
+      if (navScaleValue) navScaleValue.textContent = pct + '%';
       const s = getSaved(); if (s) _saveFull(s.name, s.colors);
     });
   }

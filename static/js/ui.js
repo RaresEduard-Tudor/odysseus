@@ -1285,4 +1285,20 @@ if (!window._odyEscExpandGuard) {
     if (closeBtn) { try { closeBtn.click(); } catch {} }
     else { try { topModal.classList.add('hidden'); } catch {} }
   }, true);
+
+  // ── Click the dim backdrop to close the window ──
+  // The visible .modal overlay captures pointer events (see style.css). A press
+  // that lands on the overlay itself — the dim area around the window, not its
+  // .modal-content — closes that window via the same path as Esc. mousedown +
+  // a strict target check avoids false positives from header drags or edge
+  // resizes, which start inside the content (never on the overlay element).
+  document.addEventListener('mousedown', (e) => {
+    const overlay = e.target;
+    if (!(overlay instanceof Element) || !overlay.classList.contains('modal')) return;
+    if (!_isVisible(overlay) || overlay.classList.contains('minimized')) return;
+    const closeBtn = overlay.querySelector('.close-btn, .modal-close-btn, [data-action="close"]');
+    e.preventDefault();
+    if (closeBtn) { try { closeBtn.click(); } catch {} }
+    else { try { overlay.classList.add('hidden'); } catch {} }
+  }, true);
 }

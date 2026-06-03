@@ -134,11 +134,15 @@ html {
 
 /* ── Density Overrides ── */
 
-:root.density-compact { font-size: 13px; }
+/* Base UI text size (comfortable default). Density toggles step around it;
+   keep them ordered: compact < comfortable < spacious. Most text uses
+   em/rem so it scales off this root size. */
+:root { font-size: 17px; }
+:root.density-compact { font-size: 14px; }
 :root.density-compact .msg { padding: 6px 10px; margin-bottom: 4px; }
 :root.density-compact .list-item { padding: 4px 8px; }
 :root.density-compact .sidebar .section { padding: 0; }
-:root.density-spacious { font-size: 16px; }
+:root.density-spacious { font-size: 19px; }
 :root.density-spacious .msg { padding: 14px 18px; margin-bottom: 12px; }
 :root.density-spacious .list-item { padding: 8px 12px; }
 :root.density-spacious .sidebar .section { padding: 0; }
@@ -546,7 +550,7 @@ body.bg-pattern-sparkles {
       min-height: 24px;
     }
     .sidebar-brand-title {
-      font-size: 1rem;
+      font-size: calc(16px * var(--nav-scale, 1));
       font-weight: 600;
       line-height: 1.35;
       color: var(--brand-color, var(--red));
@@ -572,6 +576,19 @@ body.bg-pattern-sparkles {
     }
     #tools-section .list-item {
       padding: 8px 8px;
+    }
+    /* Leading menu icons (Brain, Calendar, chats, new-chat, search, …) scale
+       with --nav-scale so they track their labels across the whole expanded
+       sidebar menu (the "big" nav format). > svg targets only the leading
+       icon, not the nested "new" plus-buttons. */
+    .sidebar .list-item > svg {
+      width: calc(14px * var(--nav-scale, 1));
+      height: calc(14px * var(--nav-scale, 1));
+    }
+    /* Sidebar menu label text (tool names, chat titles) — driven by --nav-scale
+       so the whole left nav resizes together, independent of UI size. */
+    .sidebar .list-item {
+      font-size: calc(16px * var(--nav-scale, 1));
     }
     .sidebar.right-side .sidebar-header {
       justify-content: flex-start;
@@ -626,7 +643,10 @@ body.bg-pattern-sparkles {
        so the rail stays visible without needing a z-index hack (which
        used to cover the fixed-position hamburger button). */
     .icon-rail {
-      width: 48px;
+      /* Driven by --nav-scale (the Nav size control), independent of the UI
+         size / root font-size. var fallback 1 = current look. --icon-rail-w is
+         measured live from this element, so panel offsets follow automatically. */
+      width: calc(58px * var(--nav-scale, 1));
       flex-shrink: 0;
       background: var(--panel);
       border-right: 1px solid var(--border);
@@ -675,12 +695,12 @@ body.bg-pattern-sparkles {
     }
     .icon-rail-btn {
       position: relative;
-      width: 34px;
-      height: 34px;
+      width: calc(42px * var(--nav-scale, 1));
+      height: calc(42px * var(--nav-scale, 1));
       border: none;
       background: transparent;
       color: var(--accent, var(--red));
-      font-size: 16px;
+      font-size: calc(18px * var(--nav-scale, 1));
       border-radius: 6px;
       cursor: pointer;
       display: flex;
@@ -688,6 +708,12 @@ body.bg-pattern-sparkles {
       justify-content: center;
       opacity: 0.5;
       transition: opacity 0.08s, background 0.08s;
+    }
+    /* Icons are inline SVGs hardcoded at 16x16; scale them up to match the
+       larger rail buttons. CSS width/height overrides the inline attrs. */
+    .icon-rail-btn svg {
+      width: calc(20px * var(--nav-scale, 1));
+      height: calc(20px * var(--nav-scale, 1));
     }
     .rail-notes-badge {
       position: absolute;
@@ -1125,7 +1151,8 @@ body.bg-pattern-sparkles {
       flex: 1; cursor: pointer; user-select: none;
       display: flex; align-items: center; gap: 6px;
       margin: 0; padding: 0; border: none;
-      font-size: 10px; font-weight: 400; font-family: inherit;
+      /* Driven by --nav-scale (Nav size), independent of UI size. */
+      font-size: calc(10px * var(--nav-scale, 1)); font-weight: 400; font-family: inherit;
       line-height: 1; letter-spacing: 0; text-transform: none;
       color: var(--fg);
     }
@@ -1136,6 +1163,10 @@ body.bg-pattern-sparkles {
       position: relative;
       left: -1px;
       color: var(--accent, var(--red));
+      /* Scale with --nav-scale so section icons track their labels.
+         Overrides the inline 12/13 width/height attrs. */
+      width: calc(14px * var(--nav-scale, 1));
+      height: calc(14px * var(--nav-scale, 1));
     }
     /* Shared notification dot for sidebar section titles. Single source of
        truth so chats / email / assistant / future-section dots all sit at
@@ -1302,6 +1333,11 @@ body.bg-pattern-sparkles {
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .row { display:flex; gap:6px; align-items:center; }
+    /* Ease the hover tint/border instead of snapping. */
+    .list-item,
+    .models-row {
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
     .list-item:hover,
     .models-row:hover {
       background: color-mix(in srgb, var(--red) 8%, transparent);
@@ -2119,6 +2155,12 @@ body.bg-pattern-sparkles {
       margin-left: auto;
       margin-right: auto;
       width: 100%;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    /* Subtle accent highlight while typing — the composer reads as focused. */
+    .chat-input-bar:focus-within {
+      border-color: color-mix(in srgb, var(--red) 55%, var(--border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 12%, transparent);
     }
     .chat-input-top {
       width: 100%;
@@ -4715,6 +4757,33 @@ body.bg-pattern-sparkles {
     #cookbook-modal { z-index: 260; }
     .modal.hidden { display:none; }
 
+    /* Focused-modal behaviour: a visible window captures pointer events and
+       lays a full-viewport dim/blur behind itself (via ::before, so it covers
+       the whole screen including the nav even though tool overlays are narrowed
+       to the chat area). A click on that backdrop — i.e. the overlay element,
+       not its .modal-content — is caught in ui.js and closes the window, same
+       path as Esc. Only applies while open and not minimized. */
+    .modal:not(.hidden):not(.minimized) {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .modal:not(.hidden):not(.minimized)::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+      pointer-events: auto;
+      /* Ease the dim in alongside the window's open animation instead of
+         popping to full opacity. */
+      animation: modal-backdrop-in 0.22s ease-out both;
+    }
+    @keyframes modal-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+    /* The window itself keeps the default cursor and sits above the backdrop —
+       only the dim area is a click-to-close target. */
+    .modal:not(.hidden) .modal-content { cursor: auto; position: relative; z-index: 1; }
+
     /* Tool windows open centered in the CHAT AREA (the space right of the
        sidebar + icon rail), rather than the full viewport.
        We narrow the overlay to the chat area so its flex-centering lands the
@@ -4741,11 +4810,35 @@ body.bg-pattern-sparkles {
            centered window glides instead of jumping when the nav toggles. */
         transition: left 0.25s ease, width 0.25s ease;
       }
+      /* Bigger tool windows. These default to the small .modal-content width
+         (520px); roomier sizes suit browsers/editors. Scoped to tool IDs so
+         compact dialogs (rename, confirm, prompt) keep the small base. The %
+         is of the chat-area overlay, so a window never spills over the nav. */
+      #calendar-modal .modal-content,
+      #gallery-modal .modal-content,
+      #memory-modal .modal-content,
+      #doclib-modal .modal-content,
+      #compare-model-overlay .modal-content,
+      #research-overlay .modal-content,
+      #theme-modal .modal-content,
+      #settings-modal .modal-content,
+      #email-lib-modal .modal-content {
+        /* Scale the *responsive* size (min of 960px or 94% of the work area) so
+           the UI size slider changes width smoothly the whole way down instead
+           of sitting on the 94% cap and then lurching. max-width only guards
+           the top end against overflow. */
+        width: calc(min(960px, 94%) * var(--win-scale, 1));
+        max-width: 96%;
+        max-height: min(calc(92vh * var(--win-scale, 1)), 96vh);
+      }
     }
     .modal-content {
       background:var(--panel);
       border:1px solid var(--border);
-      width:min(520px, 92vw); max-height:85vh; padding:10px;
+      /* --win-scale (the UI size control) multiplies window dimensions.
+         Scale the responsive size so it shrinks smoothly; max-width guards the
+         top end. (See the tool-window rule above for the rationale.) */
+      width:calc(min(520px, 92vw) * var(--win-scale, 1)); max-width:92vw; max-height:min(calc(85vh * var(--win-scale, 1)), 96vh); padding:10px;
       box-sizing:border-box; font-size:14px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       letter-spacing: -0.015em;
@@ -4832,12 +4925,16 @@ body.bg-pattern-sparkles {
       border-radius:4px;
       line-height:1;
       flex-shrink:0;
+      transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
     }
     .close-btn:hover,
     .modal-close:hover {
       background:var(--fg);
       color:var(--bg);
+      transform: scale(1.08);
     }
+    .close-btn:active,
+    .modal-close:active { transform: scale(0.94); }
     /* Minimize button — sits beside the close button on every modal */
     .minimize-btn {
       background:var(--bg);
@@ -20971,7 +21068,7 @@ body:not(.welcome-ready) #welcome-screen {
 }
 
 /* ── Tasks ── */
-.tasks-modal-content { max-width: 600px; width: min(600px, 92vw); background: var(--bg); font-size: 12px; }
+.tasks-modal-content { max-width: 96%; width: calc(min(840px, 94%) * var(--win-scale, 1)); background: var(--bg); font-size: 12px; }
 
 /* Tasks tabs reuse the .memory-tab look. The Brain window's tab bar is
    full-bleed (its underline spans the whole modal width). The Tasks bar is a
@@ -32117,7 +32214,7 @@ body.notes-mobile-mode.notes-drag-mode .note-card-pin.active {
 .note-cl-add:hover { opacity: 0.7; }
 
 /* ── Calendar ── */
-.cal-modal-content { width:min(680px, 94vw); max-height:88vh; overflow-x:hidden; }
+.cal-modal-content { width:calc(min(960px, 94%) * var(--win-scale, 1)); max-width:96%; max-height:min(calc(92vh * var(--win-scale, 1)), 96vh); overflow-x:hidden; }
 /* Was overflow-y:auto with grid + day-detail flowing naturally. Now uses a
    true splitter layout: the body is a flex column that doesn't scroll
    itself; the grid takes the remaining space and scrolls if needed; the

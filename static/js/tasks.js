@@ -1320,7 +1320,8 @@ function _showForm(existing, initTaskType, initTriggerType) {
         ? `${existing.endpoint_url}::${existing.model}`
         : '';
       for (const it of items) {
-        if (it.offline || !it.models || it.models.length === 0) continue;
+        const _hasModels = (it.models && it.models.length) || (it.models_extra && it.models_extra.length);
+        if (it.offline || !_hasModels) continue;
         const group = document.createElement('optgroup');
         group.label = it.endpoint_name || it.host || 'endpoint';
         const all = sortModelIds([...(it.models || []), ...(it.models_extra || [])]);

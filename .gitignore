@@ -89,3 +89,12 @@ docs/windows-port/
 compound.config.json
 *.error.log
 _scratch/
+
+# Container HOME caches written into the mounted repo (/app is the
+# container's home, so npm/pip/etc. drop caches here). Runtime junk, not source.
+.npm/
+.cache/
+.local/
+.ssh/
+# Alternate data dir for the docker-compose test instance
+data-docker/

@@ -1258,6 +1258,24 @@ async def action_daily_brief(owner: str, **kwargs) -> Tuple[str, bool]:
         date_label = today.strftime(f"%A, %B {today.day}, %Y")
 
         plain = [f"Daily brief — {date_label}", ""]
+
+        # ----- Fuel: today's official prices (best-effort, no LLM) -----
+        try:
+            import asyncio as _aio
+            fuel_table = await _aio.to_thread(
+                _fetch_fuel_table, ["Diesel (B7)", "Super 95 (E10)", "Super 98 (E5)"]
+            )
+            fuel_bits = []
+            for lbl, short in [("Diesel (B7)", "Diesel"), ("Super 95 (E10)", "95"),
+                               ("Super 98 (E5)", "98")]:
+                if lbl in fuel_table:
+                    fuel_bits.append(f"{short} {fuel_table[lbl][0]}")
+            if fuel_bits:
+                plain.append("Fuel €/l: " + " · ".join(fuel_bits))
+                plain.append("")
+        except Exception as fe:
+            logger.debug("daily_brief: fuel section failed: %s", fe)
+
         if events:
             plain.append("Calendar:")
             for e in events:
@@ -2187,7 +2205,135 @@ async def action_check_email_urgency(owner: str, **kwargs) -> Tuple[str, bool]:
         return str(e), False
 
 
+def _fetch_fuel_table(wanted: list) -> dict:
+    """Scrape carbu.com's official Belgian price table → {label: (today, upcoming, arrow)}.
+
+    carbu.com's table now lists a single current price plus a Dutch status
+    ("Onveranderd" = unchanged, "n.b." = unavailable); the older layout carried
+    two prices (today + upcoming). Handles both. Shared by get_fuel_price and
+    fuel_price_alert. Blocking (urllib) — call via asyncio.to_thread."""
+    import re
+    import urllib.request
+
+    url = "https://carbu.com/belgie/index.php/officieleprijs"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    html = urllib.request.urlopen(req, timeout=20).read().decode("utf-8", "ignore")
+    table = {}
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S):
+        txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
+        for label in wanted:
+            # First matching row per fuel is the official-price row; later rows
+            # are margin tables.
+            if label in table or not txt.startswith(label):
+                continue
+            prices = re.findall(r"(\d,\d{3,4})\s*&euro;/l", row)
+            if not prices:
+                continue
+            if len(prices) >= 2:
+                # Legacy two-price layout: today -> upcoming + arrow icon.
+                arrow = "↑" if "arrow-up" in row else ("↓" if "arrow-down" in row else "=")
+                table[label] = (prices[0], prices[1], arrow)
+            else:
+                # Current single-price layout: today's price, no known upcoming.
+                table[label] = (prices[0], prices[0], "=")
+    return table
+
+
+async def action_get_fuel_price(owner: str, fuel: str = "", **kwargs) -> Tuple[str, bool]:
+    """Scrape carbu.com's official Belgian price table for one fuel and report
+    today's price -> the upcoming official price with an up/down arrow. Fully
+    deterministic (raw HTML + regex) — no LLM, so no truncation/hallucination."""
+    import asyncio
+
+    # Comma-separated override via `fuel`, else the default trio.
+    if fuel and fuel.strip():
+        wanted = [f.strip() for f in fuel.split(",") if f.strip()]
+    else:
+        wanted = ["Super 95 (E10)", "Super 98 (E5)", "Diesel (B7)"]
+
+    try:
+        table = await asyncio.to_thread(_fetch_fuel_table, wanted)
+    except Exception as e:
+        return f"Fuel price fetch failed: {e}", False
+    if not table:
+        return "No fuel prices found on carbu.com", False
+
+    lines = []
+    for label in wanted:
+        name = label.replace("(", "").replace(")", "").strip()
+        if label not in table:
+            lines.append(f"{name}: not found")
+            continue
+        today, upcoming, arrow = table[label]
+        if today == upcoming:
+            lines.append(f"{name}: no change ({today} €/l)")
+        else:
+            lines.append(f"{name}: {today} → {upcoming} {arrow} €/l")
+    return "\n".join(lines), True
+
+
+async def action_fuel_price_alert(owner: str, fuel: str = "", **kwargs) -> Tuple[str, bool]:
+    """Notify ONLY when an official Belgian fuel price changes.
+
+    Scrapes the current prices, diffs them against the last-seen values saved
+    in data/fuel_state.json, and returns a change summary (delivered via the
+    task's output_target). When nothing changed it raises TaskNoop so the run
+    is marked "skipped" and no email/notification is sent — no daily noise."""
+    import asyncio
+    import json
+    import os
+    from src.constants import DATA_DIR
+
+    if fuel and fuel.strip():
+        wanted = [f.strip() for f in fuel.split(",") if f.strip()]
+    else:
+        wanted = ["Super 95 (E10)", "Super 98 (E5)", "Diesel (B7)"]
+
+    try:
+        table = await asyncio.to_thread(_fetch_fuel_table, wanted)
+    except Exception as e:
+        return f"Fuel price fetch failed: {e}", False
+    if not table:
+        return "No fuel prices found on carbu.com", False
+
+    # Per-owner state file so multi-user deploys don't clobber each other.
+    suffix = f"_{owner}" if owner else ""
+    state_path = os.path.join(DATA_DIR, f"fuel_state{suffix}.json")
+    try:
+        with open(state_path) as f:
+            last = json.load(f)
+    except Exception:
+        last = {}
+
+    current = {label: table[label][0] for label in table}  # today's price per fuel
+    changes = []
+    for label, price in current.items():
+        prev = last.get(label)
+        name = label.replace("(", "").replace(")", "").strip()
+        if prev is None:
+            continue  # first sighting — seed silently, don't alert
+        if price != prev:
+            arrow = "↑" if price > prev else "↓"
+            changes.append(f"{name}: {prev} → {price} {arrow} €/l")
+
+    first_run = not last
+    # Persist the new snapshot regardless.
+    try:
+        with open(state_path, "w") as f:
+            json.dump(current, f)
+    except Exception as e:
+        logger.warning("fuel_price_alert: could not write state %s: %s", state_path, e)
+
+    if first_run:
+        raise TaskNoop(f"seeded {len(current)} fuel prices (no baseline yet)")
+    if not changes:
+        raise TaskNoop("no fuel price change")
+    return "Fuel price change:\n" + "\n".join(changes), True
+
+
 BUILTIN_ACTIONS = {
+    "get_fuel_price": action_get_fuel_price,
+    "fuel_price_alert": action_fuel_price_alert,
     "tidy_sessions": action_tidy_sessions,
     "tidy_documents": action_tidy_documents,
     "consolidate_memory": action_consolidate_memory,
@@ -2212,6 +2358,8 @@ BUILTIN_ACTIONS = {
 
 # Descriptions for the UI/API
 BUILTIN_ACTION_INFO = {
+    "get_fuel_price": "Fetch the official Belgian fuel price from carbu.com (today's price → upcoming price with arrow). Diesel (B7) by default — deterministic, no LLM.",
+    "fuel_price_alert": "Notify only when an official Belgian fuel price changes (diffs vs last-seen state). Silent on no change — schedule it as often as you like without inbox noise.",
     "tidy_sessions": "Clean up empty chat sessions and auto-sort into folders",
     "tidy_documents": "Remove junk/empty documents",
     "consolidate_memory": "Remove duplicate memories",

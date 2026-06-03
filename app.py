@@ -166,6 +166,10 @@ if AUTH_ENABLED:
         "/api/auth/integrations/presets",
         "/api/health",
         "/api/version",
+        # Read-only dashboard stats for the gethomepage.dev customapi widget.
+        # No mutations; unauthenticated callers resolve to the single-user
+        # ("") owner view. Exempt so the homepage tile can poll without a token.
+        "/api/homepage-stats",
         "/login",
     }
     AUTH_EXEMPT_PREFIXES = ["/static"]
@@ -697,6 +701,9 @@ app.include_router(setup_contacts_routes())
 
 from companion import setup_companion_routes
 app.include_router(setup_companion_routes())
+
+from routes.homepage_routes import setup_homepage_routes
+app.include_router(setup_homepage_routes())
 
 # ========= ROUTES (kept in app.py) =========
 

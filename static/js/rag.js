@@ -168,10 +168,41 @@ function _setupUploadZone() {
   });
 }
 
+/**
+ * Index a directory into RAG. Reads #rag-directory, POSTs to the
+ * add_directory route, then refreshes the file list.
+ */
+export async function addRagDirectory(showToast, showError) {
+  const input = document.getElementById('rag-directory');
+  const dir = (input?.value || '').trim();
+  const fail = showError || ((m) => alert(m));
+  if (!dir) { fail('Enter a directory path'); return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/personal/add_directory`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directory: dir })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.detail || data.message || `HTTP ${res.status}`);
+    }
+    if (input) input.value = '';
+    (showToast || (() => {}))(`Indexed ${data.indexed_count ?? 0} chunks from ${dir}`);
+    await loadPersonalDocs();
+  } catch (e) {
+    console.error('Add directory failed:', e);
+    fail('Failed to index directory: ' + e.message);
+  }
+}
+
 const ragModule = {
   init,
   loadPersonalDocs,
-  uploadRagFiles
+  uploadRagFiles,
+  addRagDirectory
 };
 
 export default ragModule;
