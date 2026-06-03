@@ -85,7 +85,14 @@ export function init(apiBase) {
   initSaveAsTemplate();
   initExpandButton();
   initPersistentChat();
+  initPersonaButton();
   loadUserTemplates();
+}
+
+// Composer button (next to shell/search) that opens the persona/prompt modal.
+function initPersonaButton() {
+  const btn = document.getElementById('persona-btn');
+  if (btn) btn.addEventListener('click', () => openCustomPresetModal());
 }
 
 function initCharTabs() {
