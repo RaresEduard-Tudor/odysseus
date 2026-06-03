@@ -2209,15 +2209,24 @@ async def action_get_fuel_price(owner: str, fuel: str = "", **kwargs) -> Tuple[s
         for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S):
             txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
             for label in wanted:
-                # First matching row per fuel is the official-price row
-                # (today + upcoming); later rows are margin tables (1 price).
+                # First matching row per fuel is the official-price row;
+                # later rows are margin tables. carbu.com's table now lists a
+                # single current price plus a Dutch status ("Onveranderd" =
+                # unchanged, "n.b." = unavailable); older layout carried two
+                # prices (today + upcoming). Handle both.
                 if label in table or not txt.startswith(label):
                     continue
                 prices = re.findall(r"(\d,\d{3,4})\s*&euro;/l", row)
-                if len(prices) < 2:
+                if not prices:
                     continue
-                arrow = "↑" if "arrow-up" in row else ("↓" if "arrow-down" in row else "=")
-                table[label] = (prices[0], prices[1], arrow)
+                if len(prices) >= 2:
+                    # Legacy two-price layout: today -> upcoming + arrow icon.
+                    arrow = "↑" if "arrow-up" in row else ("↓" if "arrow-down" in row else "=")
+                    table[label] = (prices[0], prices[1], arrow)
+                else:
+                    # Current single-price layout: report today's price; mark
+                    # unchanged when the row says so, else unknown upcoming.
+                    table[label] = (prices[0], prices[0], "=")
         return table
 
     try:
