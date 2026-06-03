@@ -166,6 +166,10 @@ if AUTH_ENABLED:
         "/api/auth/integrations/presets",
         "/api/health",
         "/api/version",
+        # Read-only dashboard stats for the gethomepage.dev customapi widget.
+        # No mutations; unauthenticated callers resolve to the single-user
+        # ("") owner view. Exempt so the homepage tile can poll without a token.
+        "/api/homepage-stats",
         "/login",
     }
     AUTH_EXEMPT_PREFIXES = ["/static"]
