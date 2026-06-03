@@ -562,7 +562,10 @@ async def _direct_fallback(
             raw = content.strip()
             query = raw
             time_filter = None
-            max_pages = 5
+            # 3 pages (not 5): each result triggers a full webpage fetch+extract,
+            # and 5 routinely blew the wait_for budget below. 3 is plenty for a
+            # quick lookup and finishes well within the timeout.
+            max_pages = 3
             # Allow JSON-shaped args: {"query": "...", "time_filter": "day", "max_pages": 7}
             if raw.startswith("{"):
                 try:
@@ -601,7 +604,9 @@ async def _direct_fallback(
                         return_sources=True,
                     ),
                 ),
-                timeout=30,
+                # 75s (was 30s): searxng query + N full webpage fetches can be
+                # slow on a self-hosted box; 30s timed out before results came back.
+                timeout=75,
             )
             output = text[:MAX_OUTPUT_CHARS] if len(text) > MAX_OUTPUT_CHARS else text
             if sources:
