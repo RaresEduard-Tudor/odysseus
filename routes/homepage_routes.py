@@ -77,6 +77,16 @@ def _gather(owner: str) -> Dict[str, Any]:
                         out["fuel_95"] = val
                     elif "98" in label and "e5" in label:
                         out["fuel_98"] = val
+                # Combined one-field view: "Diesel 2,08 · 95 1,87 · 98 1,95".
+                combined = []
+                if out.get("fuel_diesel"):
+                    combined.append(f"Diesel {out['fuel_diesel']}")
+                if out.get("fuel_95"):
+                    combined.append(f"95 {out['fuel_95']}")
+                if out.get("fuel_98"):
+                    combined.append(f"98 {out['fuel_98']}")
+                if combined:
+                    out["fuel"] = " · ".join(combined)
         except Exception as e:
             logger.debug("homepage fuel section failed: %s", e)
 

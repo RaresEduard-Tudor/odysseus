@@ -97,6 +97,8 @@ def test_gather_owner_scoped_counts(seeded_sessionlocal):
     # fuel parsed from the action text
     assert out["fuel_diesel"] == "2,0800"
     assert out["fuel_95"] == "1,8740"
+    # combined one-field view
+    assert out["fuel"] == "Diesel 2,0800 · 95 1,8740"
     # briefing assembled
     assert "Diesel 2,0800" in out["briefing"]
 
