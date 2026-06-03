@@ -23,8 +23,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install Python deps first (layer cache)
-COPY requirements.txt .
+COPY requirements.txt requirements-optional.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Optional features (PDF viewer/forms via PyMuPDF, local STT, DuckDuckGo,
+# Office/EPUB extraction). Off by default — PyMuPDF is AGPL-3.0, so installing
+# it carries AGPL obligations for a network-served app (see ACKNOWLEDGMENTS.md).
+# Opt in per-deploy: set INSTALL_OPTIONAL_DEPS=1 (e.g. in .env).
+ARG INSTALL_OPTIONAL_DEPS=0
+RUN if [ "$INSTALL_OPTIONAL_DEPS" = "1" ]; then \
+      pip install --no-cache-dir -r requirements-optional.txt; \
+    fi
 
 # Copy app code
 COPY . .
