@@ -43,7 +43,7 @@ def _fmt_when(dt: datetime) -> str:
 def _gather(owner: str) -> Dict[str, Any]:
     from core.database import (
         SessionLocal, ScheduledTask, Memory, Document, ChatMessage,
-        Session as DbSession, CalendarEvent, CalendarCal,
+        Session as DbSession, CalendarEvent, CalendarCal, EmailAccount,
     )
 
     out: Dict[str, Any] = {}
@@ -161,17 +161,26 @@ def _gather(owner: str) -> Dict[str, Any]:
             logger.debug("homepage activity failed: %s", e)
 
         # ── Email (best-effort, may be null if not configured/slow) ──
+        # Resolve an account first: the caller's, or — when anonymous (owner
+        # "", e.g. the auth-exempt homepage widget) — the first enabled one,
+        # default preferred. _imap is a context manager, not a connection.
         try:
             from routes.email_helpers import _imap
-            conn = _imap(owner=owner or "")
-            if conn is not None:
-                conn.select("INBOX", readonly=True)
-                typ, data = conn.search(None, "UNSEEN")
-                if typ == "OK":
-                    out["unread_email"] = len(data[0].split()) if data and data[0] else 0
-                typ2, data2 = conn.search(None, '(KEYWORD "urgent")')
-                if typ2 == "OK":
-                    out["urgent_email"] = len(data2[0].split()) if data2 and data2[0] else 0
+            acc_q = db.query(EmailAccount).filter(EmailAccount.enabled == True)  # noqa: E712
+            if owner:
+                acc_q = acc_q.filter(EmailAccount.owner == owner)
+            acc = acc_q.order_by(
+                EmailAccount.is_default.desc(), EmailAccount.created_at.asc()
+            ).first()
+            if acc:
+                with _imap(account_id=acc.id, owner=acc.owner or "") as conn:
+                    conn.select("INBOX", readonly=True)
+                    typ, data = conn.search(None, "UNSEEN")
+                    if typ == "OK":
+                        out["unread_email"] = len(data[0].split()) if data and data[0] else 0
+                    typ2, data2 = conn.search(None, '(KEYWORD "urgent")')
+                    if typ2 == "OK":
+                        out["urgent_email"] = len(data2[0].split()) if data2 and data2[0] else 0
         except Exception as e:
             logger.debug("homepage email section failed: %s", e)
 
