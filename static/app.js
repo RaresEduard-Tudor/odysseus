@@ -303,7 +303,9 @@ function initializeEventListeners() {
           label = (raw || '').trim() || 'Assistant';
         }
         const body = child.querySelector('.body');
-        const text = body ? (body.innerText || body.textContent || '').trim() : '';
+        // Prefer dataset.raw (original markdown) over innerText (rendered HTML as text)
+        // to avoid extra newlines and formatting artifacts.
+        const text = body ? (body.dataset.raw || body.innerText || body.textContent || '').trim() : '';
         if (text) parts.push(`${label}: ${text}`);
       } else if (child.classList?.contains('agent-thread')) {
         const lines = ['[Tool calls]'];
@@ -532,6 +534,13 @@ function initializeEventListeners() {
         return;
       }
 
+      // Model picker popup — close before opening any modals
+      const modelPickerMenu = document.getElementById('model-picker-menu');
+      if (modelPickerMenu && modelPickerMenu.classList.contains('open')) {
+        modelPickerMenu.classList.remove('open');
+        return;
+      }
+
       // Close one modal at a time (last in DOM = topmost)
       // Map modal id → sidebar list-item id to clear active state
       const modalItemMap = {
@@ -543,7 +552,7 @@ function initializeEventListeners() {
       };
 
       // Dynamic modals (removed from DOM on close)
-      const dynamicModals = ['library-modal', 'archive-modal', 'doclib-modal', 'gallery-modal', 'tasks-modal'];
+      const dynamicModals = ['library-modal', 'archive-modal', 'doclib-modal', 'gallery-modal', 'tasks-modal', 'email-lib-modal'];
       for (const id of dynamicModals) {
         const m = document.getElementById(id);
         if (id === 'gallery-modal') {
@@ -3130,10 +3139,7 @@ function initializeEventListeners() {
         const idx = sessions.findIndex(s => s.id === currentId);
         const nextSession = sessions.filter(s => !s.archived && s.id !== currentId)[Math.max(0, idx)] ||
                             sessions.find(s => !s.archived && s.id !== currentId);
-        const res = await fetch(`${API_BASE}/api/session/${currentId}/archive`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const res = await fetch(`${API_BASE}/api/session/${currentId}`, { method: 'DELETE' });
         if (res.ok) {
           await sessionModule.loadSessions();
           if (nextSession) {
@@ -3160,7 +3166,7 @@ function initializeEventListeners() {
       setTimeout(() => uiModule.autoResize(textarea), 1);
     });
     textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         // If ghost autocomplete is active, accept the suggestion instead of submitting
         if (window._ghostAutocomplete && window._ghostAutocomplete.isActive()) {
           e.preventDefault();
@@ -3733,7 +3739,7 @@ function startOdysseusApp() {
   // Enter to send (shift+enter for newline), or new chat when empty
   if (messageInput) {
     messageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         // Flush the debounced icon update so dataset.mode reflects the current
         // text state. Without this, a fast type-and-Enter would still see the

@@ -337,14 +337,25 @@ def _decode_header(raw):
     """Decode MIME encoded header."""
     if not raw:
         return ""
-    parts = email.header.decode_header(raw)
-    decoded = []
-    for data, charset in parts:
-        if isinstance(data, bytes):
-            decoded.append(data.decode(charset or "utf-8", errors="replace"))
-        else:
-            decoded.append(data)
-    return " ".join(decoded)
+    try:
+        # make_header concatenates per RFC 2047: no spurious space between an
+        # encoded-word and adjacent plain text (plain runs keep their own
+        # whitespace), and whitespace between two adjacent encoded-words is
+        # dropped. The old " ".join produced "Re:  Jose" style double spaces
+        # on every non-ASCII subject or sender.
+        return str(email.header.make_header(email.header.decode_header(raw)))
+    except Exception:
+        # Malformed header or unknown charset: lossy per-part decode
+        decoded = []
+        for data, charset in email.header.decode_header(raw):
+            if isinstance(data, bytes):
+                try:
+                    decoded.append(data.decode(charset or "utf-8", errors="replace"))
+                except LookupError:
+                    decoded.append(data.decode("utf-8", errors="replace"))
+            else:
+                decoded.append(data)
+        return "".join(decoded)
 
 
 def _extract_text(msg):
@@ -417,6 +428,11 @@ def _list_emails(folder="INBOX", max_results=20, unresponded_only=False,
         status, data = conn.uid("SEARCH", None, "(UNSEEN UNANSWERED)")
     elif unread_only:
         status, data = conn.uid("SEARCH", None, "(UNSEEN)")
+    elif unresponded_only:
+        # Was missing — unresponded_only=True (without unread_only) fell through
+        # to "ALL" and returned answered mail too, despite the documented
+        # "emails without replies" behaviour.
+        status, data = conn.uid("SEARCH", None, "(UNANSWERED)")
     else:
         # Include read too — IMAP search "ALL" returns the entire folder
         status, data = conn.uid("SEARCH", None, "ALL")
