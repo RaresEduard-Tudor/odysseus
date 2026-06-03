@@ -788,8 +788,11 @@ import createResearchSynapse from './researchSynapse.js';
       const _tState = Storage.loadToggleState();
       const _isAgent = (_tState.mode || 'chat') === 'agent';
 
-      // Timeout: 6 min for research and agent mode, 3 min otherwise
-      const timeoutMs = el('research-toggle').checked || _isAgent ? RESEARCH_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+      // Timeout: 6 min for research, agent, AND web search (all do slow
+      // multi-step work — searxng + page fetches + large-context generation on
+      // a local model easily exceed the 2 min default, which aborted a stream
+      // the server had actually completed). 3 min for plain chat.
+      const timeoutMs = el('research-toggle').checked || el('web-toggle').checked || _isAgent ? RESEARCH_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
         if (!abortCtrl.signal.aborted) {
           timedOut = true;
