@@ -2072,6 +2072,12 @@ async def action_get_fuel_price(owner: str, fuel: str = "", **kwargs) -> Tuple[s
     if not table:
         return "No fuel prices found on carbu.com", False
 
+    from datetime import date, timedelta
+    today_d = date.today()
+    tomorrow_d = today_d + timedelta(days=1)
+    today_lbl = today_d.strftime("%a %b %-d")
+    tomorrow_lbl = tomorrow_d.strftime("%a %b %-d")
+
     lines = []
     for label in wanted:
         name = label.replace("(", "").replace(")", "").strip()
@@ -2080,9 +2086,12 @@ async def action_get_fuel_price(owner: str, fuel: str = "", **kwargs) -> Tuple[s
             continue
         today, upcoming, arrow = table[label]
         if today == upcoming:
-            lines.append(f"{name}: no change ({today} €/l)")
+            lines.append(f"{name}: {today} €/l (no change, {today_lbl})")
         else:
-            lines.append(f"{name}: {today} → {upcoming} {arrow} €/l")
+            lines.append(
+                f"{name}: {today} €/l today ({today_lbl}) "
+                f"→ {upcoming} €/l tomorrow ({tomorrow_lbl}) {arrow}"
+            )
     return "\n".join(lines), True
 
 
