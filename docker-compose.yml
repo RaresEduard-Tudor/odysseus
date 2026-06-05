@@ -3,9 +3,9 @@ services:
     build:
       context: .
       args:
-        # Set INSTALL_OPTIONAL_DEPS=1 in .env to bake in PDF viewer/forms
+        # Set INSTALL_OPTIONAL=true in .env to bake in PDF viewer/forms
         # (PyMuPDF, AGPL), local STT, DuckDuckGo, and Office/EPUB extraction.
-        INSTALL_OPTIONAL_DEPS: ${INSTALL_OPTIONAL_DEPS:-0}
+        INSTALL_OPTIONAL: ${INSTALL_OPTIONAL:-false}
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-7000}:7000"
     volumes:
